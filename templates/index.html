@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HR Assistant Chatbot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Quicksand:500,700&display=swap">
+    <style>
+        body { background: radial-gradient(ellipse at 50% 20%, #e9f5ff 50%, #cad8f5 100%); font-family: 'Quicksand', Arial, sans-serif; }
+        .chat-container { max-width: 700px; margin: 44px auto 30px auto; background: #fafdff; border-radius: 18px; box-shadow: 0 8px 36px 0 #9bb7e8bb; padding: 28px 32px 24px 32px; border: 2px solid #dde9ff; }
+        .chat-header { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+        .avatar-bot { width: 50px; height: 50px; border-radius: 50%; background: #e0edff; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; border: 2px solid #aad2ff; }
+        .question-box { display: flex; gap: 10px; align-items: center; }
+        .chat-area { min-height: 200px; max-height: 360px; overflow-y: auto; margin-bottom: 12px; background: #f4faff; border-radius: 10px; padding: 14px 8px 4px 8px; border: 1.5px solid #e3eaff; }
+        .chat-bubble { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 10px; animation: bubbleFadeIn 0.3s; }
+        .bubble-content { padding: 15px 18px; border-radius: 18px 18px 4px 18px; background: #fff9e5; color: #795900; font-size: 1.07rem; box-shadow: 0 1px 4px 0 #e2e6ed54; transition: background 0.2s; max-width: 77vw; min-width: 60px; }
+        .bot-bubble .bubble-content { background: #e6f3ff; color: #175292; border-radius: 18px 18px 18px 4px; border: 1.5px solid #c9e7ff; }
+        .user-bubble .bubble-content { background: #ffeddf; color: #934d00; border: 1.5px solid #ffd1a5; }
+        .chat-bubble:hover .bubble-content { background: #fcf5d1; }
+        .meta { font-size: 0.85rem; color: #9da6b1; margin-bottom: 2px; font-weight: 500; }
+        .loading-spinner { display: none; margin-left: 10px; }
+        .nav-link { font-weight: 600; }
+        @keyframes bubbleFadeIn { from { opacity: 0; transform: translateY(24px);} to { opacity: 1; transform: translateY(0);} }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand navbar-light bg-light mb-2">
+        <a class="navbar-brand font-weight-bold" href="/">HR Assistant</a>
+        <div class="navbar-nav">
+            <a class="nav-link" href="/manage">Upload/Delete Documents</a>
+        </div>
+    </nav>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="avatar-bot">
+                <img src="https://cdn-icons-png.flaticon.com/512/4712/4712035.png" alt="Bot" width="38" height="38" style="border-radius:50%;">
+            </div>
+            <h2 style="font-weight:700; margin:0;">HR Assistant Chatbot</h2>
+        </div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;">
+            <button id="newChatBtn" class="btn btn-danger mb-2" style="font-weight:600;">New Chat</button>
+        </div>
+        <div id="chatBox" class="chat-area"></div>
+        <form id="askForm" class="question-box mb-3">
+            <input id="userQuery" class="form-control" placeholder="Ask any HR question..." autocomplete="off" required>
+            <button class="btn btn-primary" type="submit" style="font-weight:600;">Ask</button>
+            <span class="loading-spinner spinner-border text-primary" id="loadingSpinner" style="width: 2rem; height: 2rem;"></span>
+        </form>
+        <div id="sourcesBox" style="display:none;">
+            <h5>Top Source Documents</h5>
+            <table class="table table-bordered sources-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Filename</th>
+                        <th>Content (snippet)</th>
+                        <th>Similarity Score</th>
+                    </tr>
+                </thead>
+                <tbody id="sourcesTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        const askForm = document.getElementById('askForm');
+        const userQuery = document.getElementById('userQuery');
+        const chatBox = document.getElementById('chatBox');
+        const sourcesBox = document.getElementById('sourcesBox');
+        const sourcesTableBody = document.getElementById('sourcesTableBody');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const newChatBtn = document.getElementById('newChatBtn');
+
+        let chatHistory = [];
+
+        newChatBtn.onclick = function() {
+            chatHistory = [];
+            renderChat();
+            sourcesBox.style.display = "none";
+        };
+
+        askForm.onsubmit = async function(e) {
+            e.preventDefault();
+            const query = userQuery.value.trim();
+            if (!query) return;
+
+            chatHistory.push({type: "user", text: query});
+            renderChat();
+            sourcesBox.style.display = "none";
+            loadingSpinner.style.display = "inline-block";
+
+            try {
+                const history = [];
+                for (let i = 0; i < chatHistory.length - 1; i += 2) {
+                    if (chatHistory[i].type === "user" && chatHistory[i+1]?.type === "bot")
+                        history.push({user: chatHistory[i].text, bot: chatHistory[i+1].text});
+                }
+                const resp = await fetch("/search", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({query, history})
+                });
+                const data = await resp.json();
+                loadingSpinner.style.display = "none";
+
+                if (data.error) {
+                    chatHistory.push({type: "error", text: data.error});
+                    renderChat();
+                    return;
+                }
+
+                if (data.history) {
+                    chatHistory = [];
+                    for (const turn of data.history) {
+                        chatHistory.push({type: "user", text: turn.user});
+                        chatHistory.push({type: "bot", text: turn.bot});
+                    }
+                    renderChat();
+                }
+
+                if (data.results && data.results.length > 0) {
+                    sourcesBox.style.display = "block";
+                    sourcesTableBody.innerHTML = "";
+                    data.results.forEach((item, idx) => {
+                        sourcesTableBody.innerHTML += `
+                            <tr>
+                                <td>${idx + 1}</td>
+                                <td>${item.meta && item.meta.filename ? item.meta.filename : "-"}</td>
+                                <td>${item.content.slice(0, 100)}...</td>
+                                <td>${item.score.toFixed(3)}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (err) {
+                loadingSpinner.style.display = "none";
+                chatHistory.push({type: "error", text: "Error: " + err.message});
+                renderChat();
+            }
+            userQuery.value = "";
+        }
+
+        function renderChat() {
+            chatBox.innerHTML = "";
+            for (const msg of chatHistory) {
+                if (msg.type === "user") {
+                    chatBox.innerHTML += `
+                        <div class="chat-bubble user-bubble">
+                            <div class="avatar-user" title="You">🧑</div>
+                            <div class="bubble-content"><span class="meta">You</span>${msg.text}</div>
+                        </div>`;
+                } else if (msg.type === "bot") {
+                    chatBox.innerHTML += `
+                        <div class="chat-bubble bot-bubble">
+                            <div class="avatar-bot" title="HR Bot">
+                                <img src="https://cdn-icons-png.flaticon.com/512/4712/4712035.png" alt="Bot" width="28" height="28" style="border-radius:50%; margin-top:2px;">
+                            </div>
+                            <div class="bubble-content"><span class="meta">HR Assistant</span>${msg.text}</div>
+                        </div>`;
+                } else if (msg.type === "error") {
+                    chatBox.innerHTML += `
+                        <div class="chat-bubble bot-bubble">
+                            <div class="avatar-bot" title="HR Bot">
+                                <img src="https://cdn-icons-png.flaticon.com/512/4712/4712035.png" alt="Bot" width="28" height="28" style="border-radius:50%; margin-top:2px;">
+                            </div>
+                            <div class="bubble-content" style="color:red;">${msg.text}</div>
+                        </div>`;
+                }
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
