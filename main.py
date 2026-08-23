@@ -1,7 +1,15 @@
+import os
+import sys
+
+try:
+    import pysqlite3
+    sys.modules["sqlite3"] = pysqlite3
+except Exception:
+    pass
+
 from fastapi import FastAPI, Request, File, UploadFile
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
-import os
 
 from config import UPLOAD_FOLDER
 from rag.vectorestore import allowed_file
