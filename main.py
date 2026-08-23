@@ -9,14 +9,19 @@ from rag.vectorestore import add_file_to_index
 from rag.pipeline import rag_search
 
 import sys
-import pysqlite3
+import os
 
-sys.modules["sqlite3"] = pysqlite3
+# Force Python to map the system sqlite3 module to your environment package
+try:
+    import pysqlite3
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    # Fallback for your local machine where pysqlite3 isn't needed
+    pass
 
-import sys
-import pysqlite3
+# NOW it is safe to import your environment packages
+import chromadb
 
-sys.modules["sqlite3"] = pysqlite3
 
 
 
