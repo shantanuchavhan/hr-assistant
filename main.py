@@ -9,12 +9,15 @@ from rag.vectorestore import add_file_to_index
 from rag.pipeline import rag_search
 
 import sys
+import pysqlite3
 
-try:
-    import pysqlite3
-    sys.modules["sqlite3"] = pysqlite3
-except Exception as e:
-    print("pysqlite3 fallback unavailable:", e)
+sys.modules["sqlite3"] = pysqlite3
+
+import sys
+import pysqlite3
+
+sys.modules["sqlite3"] = pysqlite3
+
 
 
 app= FastAPI()
