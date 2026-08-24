@@ -16,7 +16,7 @@ from rag.vectorestore import allowed_file
 from rag.vectorestore import add_file_to_index
 from rag.pipeline import rag_search
 
-import os
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 app= FastAPI()
@@ -70,9 +70,16 @@ async def upload_files(request: Request, files: list[UploadFile] = File(..., ali
 
 
 @app.get("/list_files")
-async def list_files(request:Request):
-    files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith('.txt')]
-    return {'files': files}
+async def list_files():
+
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+    files = [
+        f for f in os.listdir(UPLOAD_FOLDER)
+        if f.endswith(".txt")
+    ]
+
+    return {"files": files}
 
 
 
