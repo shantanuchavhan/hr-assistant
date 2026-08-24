@@ -7,12 +7,25 @@ from config import INDEX_STORE
 
 ALLOWED_EXTENSIONS = {"txt"}
 
-vectorstore = Chroma(
-    collection_name="hr_docs",
-    embedding_function=embeddings,
-    persist_directory=INDEX_STORE,
-    collection_metadata={"hnsw:space": "cosine"},
-)
+
+def _build_vectorstore():
+    return Chroma(
+        collection_name="hr_docs",
+        embedding_function=embeddings,
+        persist_directory=INDEX_STORE,
+        collection_metadata={"hnsw:space": "cosine"},
+    )
+
+
+vectorstore = _build_vectorstore()
+
+
+def ensure_vectorstore():
+    global vectorstore
+    try:
+        vectorstore._collection.count()
+    except Exception:
+        vectorstore = _build_vectorstore()
 
 
 def allowed_file(filename):
@@ -21,18 +34,21 @@ def allowed_file(filename):
 
 def add_file_to_index(filename, content):
     """Chunk and add a document to the vectorstore with metadata."""
+    ensure_vectorstore()
     chunks = split_text(content, filename)
     vectorstore.add_documents(chunks)
 
 
 def delete_file_from_index(filename):
     """Delete all chunks for a given filename from the vectorstore."""
+    ensure_vectorstore()
     results = vectorstore.get(where={"filename": filename})
     if results["ids"]:
         vectorstore.delete(ids=results["ids"])
 
 
 def has_documents():
+    ensure_vectorstore()
     return vectorstore._collection.count() > 0
 
 

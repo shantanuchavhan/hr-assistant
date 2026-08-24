@@ -16,21 +16,7 @@ from rag.vectorestore import allowed_file
 from rag.vectorestore import add_file_to_index
 from rag.pipeline import rag_search
 
-import sys
 import os
-
-# Force Python to map the system sqlite3 module to your environment package
-try:
-    import pysqlite3
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-except ImportError:
-    # Fallback for your local machine where pysqlite3 isn't needed
-    pass
-
-# NOW it is safe to import your environment packages
-import chromadb
-
-
 
 
 app= FastAPI()
@@ -57,20 +43,18 @@ async def upload_files(request: Request, files: list[UploadFile] = File(..., ali
     uploaded = []
 
     for file in files:
+        print("Processing:", file.filename, flush=True)
 
         if file and allowed_file(file.filename):
 
             filename = os.path.basename(file.filename)
             filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-            # Read uploaded file
             content = await file.read()
 
-            # Save file
             with open(filepath, "wb") as f:
                 f.write(content)
 
-            # Add to vector index
             add_file_to_index(
                 filename,
                 content.decode("utf-8")
@@ -94,14 +78,14 @@ async def list_files(request:Request):
 
 @app.post("/delete_file")
 async def delete_file(request:Request):
-    data= await request.json()
+    data = await request.json()
     filename = data.get("filename")
     path = os.path.join(UPLOAD_FOLDER, filename)
     if not os.path.exists(path):
-        return JSONResponse({"error","filename not found"}, status_code=404)
+        return JSONResponse({"error": "filename not found"}, status_code=404)
     os.remove(path)
 
-    return {"deleted":filename, "message": "file deleted and index updated"}
+    return {"deleted": filename, "message": "file deleted and index updated"}
 
 
 
